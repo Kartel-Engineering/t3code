@@ -1,0 +1,43 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream into fork main
+        env:
+          UPSTREAM_REPO: pingdotgg/t3code
+          UPSTREAM_BRANCH: main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch --no-tags upstream "+refs/heads/${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"
+
+          if git merge-base --is-ancestor "upstream/${UPSTREAM_BRANCH}" HEAD; then
+            echo "Fork main already contains upstream/${UPSTREAM_BRANCH}."
+            exit 0
+          fi
+
+          git merge --no-edit "upstream/${UPSTREAM_BRANCH}"
+          git push origin "HEAD:${UPSTREAM_BRANCH}"
